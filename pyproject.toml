@@ -22,7 +22,7 @@ classifiers = [
 dependencies = [
     "requests",
     "academy-py>=0.3.1",
-    "globus-compute-sdk>=4.4.0",
+    "globus-compute-sdk==2.*",
     "langchain-openai>=1.1.7",
     "langgraph>=1.0.7",
     "langchain>=1.2.8",
