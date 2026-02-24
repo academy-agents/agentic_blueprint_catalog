@@ -20,9 +20,9 @@ Here are some key features:
 2. We logically partition the 4 nodes into 2 partitions of 2 nodes each.
 3. Each DirectorAgent will own one logical partition and launch MD simulation tasks using Parsl for task execution
    and resource orchestration.
-
+    
     Step 1. Launch 2 Directors onto Node1
-
+    ``` 
     +-----------------------------AURORA@ANL------------------------------+
     +   +------------+   +---------------BATCH JOB-(4 Nodes)----------+   |
     +   | GCompute --+-->+  +-------Node1------+ +-------Node1------+ |   |
@@ -35,9 +35,9 @@ Here are some key features:
     +                    |  |                  | |                  | |   |
     +                    |  +------------------+ +------------------+ |   |
     +-----------------------------AURORA@ANL------------------------------+
-
+    ```
     Step 2. Launch a ParslExecutor on each of the logical paritions of the batch job
-
+    ```
     +-----------------------------AURORA@ANL------------------------------+
     +   +------------+   +---------------BATCH JOB-(4 Nodes)----------+   |
     +   | GCompute --+-->+  +-------Node1------+ +-------Node1------+ |   |
@@ -50,6 +50,6 @@ Here are some key features:
     +                    |  |        +--------------------------+   | |   |
     +                    |  +------------------+ +------------------+ |   |
     +-----------------------------AURORA@ANL------------------------------+
-
+    ```
 
 
