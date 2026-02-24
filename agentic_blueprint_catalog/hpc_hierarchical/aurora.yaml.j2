@@ -1,0 +1,30 @@
+endpoint_setup: {{ endpoint_setup|default() }}
+engine:
+  type: GlobusComputeEngine
+  max_workers_per_node: 4
+
+  address:
+    type: address_by_interface
+    ifname: hsn0
+
+  provider:
+    type: PBSProProvider
+    account: workflow_scaling
+
+    # Aurora supports 2-256 node request on debug-scaling
+    queue: debug-scaling
+
+    # e.g., "#PBS -l filesystems=home:grand:eagle\n#PBS -k doe"
+    scheduler_options: "#PBS -l filesystems=home:flare"
+
+    # Node setup: activate necessary conda environment and such
+    # For the Director Agent example, we split the $PBS_NODEFILE into 2 even splits
+    worker_init: |
+       source ~/setup_uv_aurora_mep.sh
+       split -d -l 2 $PBS_NODEFILE /tmp/node_slice.
+
+    walltime: 00:10:00
+    nodes_per_block: {{ nodes_per_block | default(4) }}
+    init_blocks: 0
+    min_blocks: 0
+    max_blocks: 1
