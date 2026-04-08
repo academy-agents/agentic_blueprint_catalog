@@ -4,7 +4,7 @@ Reusable agent implementations built on the Academy framework.
 
 ## PI_Calculator
 
-A simple agent that uses the Monte Carlo method for calculating Pi ([Ref](https://en.wikipedia.org/wiki/Monte_Carlo_method)) 
+A simple agent that uses the Monte Carlo method for calculating Pi ([Ref](https://en.wikipedia.org/wiki/Monte_Carlo_method))
 
 ### Usage
 
@@ -21,7 +21,7 @@ async with manager:
 ## Director
 
 An orchestration agent for running molecular dynamics (MD) simulations in parallel using Parsl.
-The `Director` uses Parsl's `HighThroughputExecutor` to provision and launch functions 
+The `Director` uses Parsl's `HighThroughputExecutor` to provision and launch functions
 on Aurora GPUs.
 
 ### Usage
