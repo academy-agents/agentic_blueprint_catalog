@@ -30,6 +30,7 @@ dependencies = [
     "ruff>=0.15.0",
     "dotenv",
     "tox>=4.34.1",
+    "flask>=3.1",
 ]
 
 
