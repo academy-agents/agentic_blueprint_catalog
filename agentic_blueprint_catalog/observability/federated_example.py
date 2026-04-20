@@ -37,8 +37,8 @@ async def main(user_agent_id: str) -> None:
     init_logging(logging.INFO)
 
     nersc = GlobusExecutor(endpoint_id='07b73b75-d534-428f-acd8-003b01a166f5')
-    # anvil = GlobusExecutor(endpoint_id='5aafb4c1-27b2-40d8-a038-a0277611868f',
-    #                       user_endpoint_config={'worker_init': 'source ~/setup_env.sh'})
+    anvil = GlobusExecutor(endpoint_id='5aafb4c1-27b2-40d8-a038-a0277611868f',
+                           user_endpoint_config={'worker_init': 'source ~/setup_env.sh'})
     frontera = GlobusExecutor(
         endpoint_id='933cff43-f895-4b92-a5c0-536a5162b8ec',
     )
@@ -48,8 +48,8 @@ async def main(user_agent_id: str) -> None:
     async with await Manager.from_exchange_factory(
         factory=HttpExchangeFactory(),
         executors={
+            'anvil': anvil,
             'nersc': nersc,
-            # 'anvil': anvil,
             'frontera': frontera,
             'local': local,
         },
@@ -58,24 +58,23 @@ async def main(user_agent_id: str) -> None:
         user_agent_handle = manager.get_handle(user_agent_id)
 
         # 2. Launch a few agents:
-        spinner = await manager.launch(
-            Spinner,
-            kwargs={'user_agent_handle': user_agent_handle},
-            executor='nersc',
-        )
-        spinner = await manager.launch(
-            Spinner,
-            kwargs={'user_agent_handle': user_agent_handle},
-            executor='frontera',
-        )
+        handles = []
+        for site in ['anvil', 'nersc', 'frontera']:
+
+            spinner = await manager.launch(
+                Spinner,
+                kwargs={'user_agent_handle': user_agent_handle},
+                executor=site,
+            )
+            handles.append(spinner)
+
         sleeper = await manager.launch(
             Sleeper,
             kwargs={'user_agent_handle': user_agent_handle},
             executor='local',
         )
-
         await spinner.trigger_user_query()
-        handles = [spinner, sleeper]
+        handles.append(sleeper)
 
         # 3. Trigger work on the worker — log messages are forwarded automatically.
         await spinner.run(iterations=5)
