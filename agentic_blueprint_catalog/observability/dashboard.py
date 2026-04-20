@@ -461,6 +461,20 @@ _HTML = r"""<!DOCTYPE html>
     [data-theme="light"] .leaflet-popup-tip { background: rgba(242,248,255,.98); }
     [data-theme="light"] .map-legend { background:rgba(240,246,255,.92); border-color:var(--border); }
 
+    /* ── Agent connection lines ── */
+    .map-conn-line {
+      stroke-dasharray: 10 7;
+      animation: mapConnFlow 1.4s linear infinite;
+    }
+    .map-conn-line.active {
+      stroke-dasharray: 10 7;
+      animation: mapConnFlow .7s linear infinite;
+      filter: drop-shadow(0 0 3px #00e5ff);
+    }
+    @keyframes mapConnFlow { to { stroke-dashoffset: -34; } }
+    [data-theme="light"] .map-conn-line { stroke: rgba(0,80,200,.45) !important; }
+    [data-theme="light"] .map-conn-line.active { stroke: rgba(0,80,200,.8) !important; filter: drop-shadow(0 0 3px rgba(0,80,200,.5)); }
+
     /* ── Ticker footer ── */
     footer {
       position:fixed; bottom:0; left:0; right:0; z-index:30;
@@ -545,8 +559,8 @@ _HTML = r"""<!DOCTYPE html>
       <div class="log-toolbar" style="margin-bottom:10px;">
         <div class="log-info">AGENT LOCATIONS</div>
         <div class="log-actions">
-          <button class="btn is-active" id="map-view-world" onclick="setMapView('world')">WORLD</button>
-          <button class="btn"           id="map-view-us"    onclick="setMapView('us')">US</button>
+          <button class="btn"           id="map-view-world" onclick="setMapView('world')">WORLD</button>
+          <button class="btn is-active" id="map-view-us"    onclick="setMapView('us')">US</button>
         </div>
       </div>
       <div id="map"></div>
@@ -678,8 +692,8 @@ function upsertCard(name, data) {
   card.innerHTML = `
     <div class="card-hdr">
       <div>
-        <div class="agent-name">${x(name)}</div>
-        <div class="agent-sub">${d.agent_id ? x(String(d.agent_id).slice(0, 22)) : 'AGENT'}</div>
+        <div class="agent-name">${x(d.agent_name || name)}</div>
+        <div class="agent-sub">${x(String(name).slice(0, 22))}</div>
       </div>
       <div style="display:flex;align-items:center">
         <div class="badge"><div class="sdot"></div><span style="color:var(--green);font-size:.62rem;letter-spacing:.15em">ONLINE</span></div>
@@ -731,7 +745,7 @@ function appendLog(entry) {
   row.innerHTML = `
     <span class="log-ts">${x(entry.ts || '--:--:--')}</span>
     <span class="log-lvl lvl-${lvl}">${lvl.padEnd(9)}</span>
-    <span class="log-src">${x((entry.agent_name || 'unknown').substring(0, 20))}</span>
+    <span class="log-src">${x((entry.agent_name || 'unknown').substring(0, 20))}${entry.agent_id ? '[' + x(String(entry.agent_id).substring(0, 4)) + ']' : ''}</span>
     <span class="log-msg">${x(entry.message || '')}</span>
   `;
   stream.appendChild(row);
@@ -878,9 +892,9 @@ function _makeIcon(d) {
   if (!d.logo_url) return null;
   return L.icon({
     iconUrl: d.logo_url,
-    iconSize: [38, 38],
-    iconAnchor: [19, 19],
-    popupAnchor: [0, -22],
+    iconSize: [45, 45],
+    iconAnchor: [22, 22],
+    popupAnchor: [0, -25],
     className: 'map-facility-icon',
   });
 }
@@ -898,7 +912,8 @@ function _popupHtml(d) {
     ? `<div class="map-popup-row"><span class="map-popup-label">${label}</span><span>${x(String(val))}</span></div>`
     : '';
   return `
-    <div class="map-popup-name">${x(d.agent || d.agent_name || '?')}</div>
+    <div class="map-popup-name">${x(d.agent_name || d.agent || '?')}</div>
+    ${row('ID', d.agent)}
     ${row('FQDN',    d.fqdn)}
     ${row('CITY',    d.geo?.city)}
     ${row('COUNTRY', d.geo?.country)}
@@ -914,7 +929,7 @@ const MAP_VIEWS = {
   world: { center: [20,    0], zoom: 2 },
   us:    { center: [38,  -97], zoom: 4 },
 };
-let _currentMapView = 'world';
+let _currentMapView = 'us';
 
 function _ensureMap() {
   if (_map) return;
@@ -943,14 +958,15 @@ function setMapView(view) {
 function _upsertMapMarker(d) {
   if (!d.geo?.lat || !d.geo?.lon) return;
   _ensureMap();
-  const name = d.agent || d.agent_name || '?';
+  const uid         = d.agent;                        // stable unique key (uid)
+  const displayName = d.agent_name || uid || '?';     // human-readable label
   const lat  = d.geo.lat, lon = d.geo.lon;
   const icon = _makeIcon(d);
   const popup = _popupHtml(d);
 
-  if (_markers[name]) {
-    _markers[name].marker.setLatLng([lat, lon]).setPopupContent(popup);
-    _markers[name].data = d;
+  if (_markers[uid]) {
+    _markers[uid].marker.setLatLng([lat, lon]).setPopupContent(popup);
+    _markers[uid].data = d;
     return;
   }
 
@@ -958,13 +974,64 @@ function _upsertMapMarker(d) {
   if (icon) {
     marker = L.marker([lat, lon], { icon }).bindPopup(popup);
   } else {
-    const color = _agentColor(name);
+    const color = _agentColor(displayName);
     marker = L.circleMarker([lat, lon], {
       radius: 10, color, fillColor: color, fillOpacity: 0.75, weight: 2,
     }).bindPopup(popup);
   }
   marker.addTo(_map);
-  _markers[name] = { marker, data: d };
+  _markers[uid] = { marker, data: d };
+}
+
+// ── Agent connection lines ─────────────────────────────────────────────────
+const _lines = {};  // 'agentA||agentB' → { line, timer }
+
+function _lineKey(a, b) { return [a, b].sort().join('||'); }
+
+// Draw (or refresh) a passive idle line between two agents.
+function _connectAgents(nameA, nameB) {
+  if (!_map) return;
+  const dA = agents[nameA], dB = agents[nameB];
+  if (!dA?.geo?.lat || !dB?.geo?.lat) return;
+  const key  = _lineKey(nameA, nameB);
+  const latlngs = [[dA.geo.lat, dA.geo.lon], [dB.geo.lat, dB.geo.lon]];
+  if (_lines[key]) {
+    _lines[key].line.setLatLngs(latlngs);
+    return;
+  }
+  const line = L.polyline(latlngs, {
+    color: '#00e5ff', weight: 1.5, opacity: 0.35,
+    className: 'map-conn-line',
+  }).addTo(_map);
+  _lines[key] = { line, timer: null };
+}
+
+// Draw idle lines between every pair of geo-located agents.
+// TODO: replace with event-driven calls to showConnection() once
+//       agent-agent communication events are wired up.
+function _drawAllConnections() {
+  const geo = Object.keys(agents).filter(n => agents[n]?.geo?.lat);
+  for (let i = 0; i < geo.length; i++) {
+    for (let j = i + 1; j < geo.length; j++) {
+      _connectAgents(geo[i], geo[j]);
+    }
+  }
+}
+
+// Public API — call this from a future agent-agent communication SSE event.
+// The line brightens and speeds up for `durationMs` ms, then reverts to idle.
+function showConnection(nameA, nameB, durationMs = 2500) {
+  _connectAgents(nameA, nameB);
+  const key  = _lineKey(nameA, nameB);
+  const entry = _lines[key];
+  if (!entry) return;
+  entry.line.setStyle({ opacity: 0.85, weight: 2.5 });
+  entry.line.getElement()?.classList.add('active');
+  clearTimeout(entry.timer);
+  entry.timer = setTimeout(() => {
+    entry.line.setStyle({ opacity: 0.35, weight: 1.5 });
+    entry.line.getElement()?.classList.remove('active');
+  }, durationMs);
 }
 
 // Handle registration event (full agent data, geo may be null initially)
@@ -973,6 +1040,7 @@ es.addEventListener('registration', e => {
   Object.assign(agents[d.agent] || (agents[d.agent] = {}), d);
   upsertCard(d.agent, agents[d.agent]);
   _upsertMapMarker(d);
+  _drawAllConnections();
   eventN++; updateHud();
 });
 
@@ -997,6 +1065,7 @@ switchTab = function (btn) {
     Object.entries(agents).forEach(([name, d]) => {
       if (d.geo?.lat) _upsertMapMarker({ ...d, agent: name });
     });
+    _drawAllConnections();
   }
 };
 </script>
@@ -1046,28 +1115,16 @@ class Dashboard:
         self._broadcast('agent_connected', {'agent': sender})
 
     def _find_facility_logo(self, org: str, fqdn: str) -> str | None:
-        """Return /assets/<filename> if any logo file keyword matches org or fqdn."""
+        """Return /assets/<filename> if any logo file keyword matches org.
+        We ignore fqdn for now.
+        """
         if not _os.path.isdir(_ASSETS_DIR):
             return None
-        search = f'{org} {fqdn}'.lower()
-        noise = {'logo', 'dark', 'light', 'bg', 'icon', 'mark'}
         for fname in sorted(_os.listdir(_ASSETS_DIR)):
-            if not fname.lower().endswith(
-                ('.png', '.jpg', '.jpeg', '.svg', '.webp'),
-            ):
-                continue
-            stem = fname.lower()
-            for ext in ('.png', '.jpg', '.jpeg', '.svg', '.webp'):
-                stem = stem.removesuffix(ext)
-            # Split on common separators; keep tokens that aren't noise or digits-only
-            tokens = [
-                t
-                for t in stem.replace('-', ' ').replace('_', ' ').split()
-                if t not in noise and not t.isdigit() and len(t) > 2
-            ]
-            if any(tok in search for tok in tokens):
+            fname_no_suffix = fname.split('.')[0]
+            if fname_no_suffix == org:
                 return f'/assets/{fname}'
-        return None
+        return '/assets/logo-Academy-2025-200x200-dark-bg.png'
 
     def register_agent(self, sender: str, reg: Registration) -> None:
         raw = dict(reg.geolocation)  # copy so we can mutate
@@ -1105,9 +1162,11 @@ class Dashboard:
         self._broadcast('registration', data)
 
     def push_log(self, sender: str, msg: Log) -> None:
+        logger.warning(f'Pushing log {msg.agent_name=}  {msg.agent_id=}')
         entry: dict[str, Any] = {
             'ts': time.strftime('%H:%M:%S'),
             'agent_name': msg.agent_name,
+            'agent_id': str(msg.agent_id),
             'level': msg.level,
             'message': msg.message,
         }
@@ -1133,13 +1192,13 @@ class Dashboard:
     def push_prompt(
         self,
         sender: str,
-        agent_id: str,
         prompt: UserPrompt,
     ) -> str:
+        agent_name = self._agents[sender]['agent_name']
         entry: dict[str, Any] = {
             'id': f'{time.time():.6f}',
-            'agent': sender,
-            'agent_id': agent_id,
+            'agent': agent_name,
+            'agent_id': sender,
             'prompt': prompt.prompt,
             'responses': prompt.responses,
         }

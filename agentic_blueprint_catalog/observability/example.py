@@ -104,7 +104,7 @@ async def main(user_agent_id: str) -> None:
 
     async with await Manager.from_exchange_factory(
         factory=HttpExchangeFactory(),
-        executors=ProcessPoolExecutor(max_workers=4),
+        executors=ProcessPoolExecutor(max_workers=8),
     ) as manager:
         # 1. Launch UserAgent first so its handle can be passed to the worker.
         user_agent_handle = manager.get_handle(user_agent_id)
@@ -114,13 +114,17 @@ async def main(user_agent_id: str) -> None:
             Spinner,
             kwargs={'user_agent_handle': user_agent_handle},
         )
-        sleeper = await manager.launch(
+        sleeper1 = await manager.launch(
+            Sleeper,
+            kwargs={'user_agent_handle': user_agent_handle},
+        )
+        sleeper2 = await manager.launch(
             Sleeper,
             kwargs={'user_agent_handle': user_agent_handle},
         )
 
         await spinner.trigger_user_query()
-        handles = [spinner, sleeper]
+        handles = [spinner, sleeper1, sleeper2]
 
         # 3. Trigger work on the worker — log messages are forwarded automatically.
         await spinner.run(iterations=5)

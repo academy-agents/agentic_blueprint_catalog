@@ -9,8 +9,8 @@ from typing import Any
 
 @dataclass
 class Registration:
-    agent_name: str
     agent_id: str
+    agent_name: str
     fqdn: str
     cpu: str
     gpu: str
@@ -22,14 +22,15 @@ class Registration:
 
 @dataclass
 class Log:
-    agent_name: str
     agent_id: str
+    agent_name: str
     message: str
     level: str = 'INFO'
 
 
 @dataclass
 class Stats:
+    agent_id: str
     cpu_percent: float
     memory_rss_mb: float
     memory_vms_mb: float
@@ -38,6 +39,7 @@ class Stats:
 
 @dataclass
 class UserPrompt:
+    agent_id: str
     prompt: str
     responses: list[str]
 

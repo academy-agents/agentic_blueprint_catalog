@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from typing import Any
 
 from academy.agent import action
 from academy.agent import Agent
+from academy.identifier import AgentId
 
 from agentic_blueprint_catalog.observability.dashboard import Dashboard
 from agentic_blueprint_catalog.observability.message import Log
@@ -33,7 +35,9 @@ class UserAgent(Agent):
 
         def _shutdown_callback(agent_id: str) -> None:
             asyncio.run_coroutine_threadsafe(
-                self._agent_manager.get_handle(agent_id).shutdown(),
+                self._agent_manager.get_handle(
+                    AgentId(uid=uuid.UUID(agent_id)),
+                ).shutdown(),
                 loop,
             )
 
@@ -43,7 +47,11 @@ class UserAgent(Agent):
 
     @action
     async def message(self, sender: str, message: Message) -> None:
-        """Route an incoming message to the appropriate dashboard handler."""
+        """Route an incoming message to the appropriate dashboard handler.
+
+        sender: Agent ID UUID string
+        message: Message object
+        """
         logger.info(
             f'Received message from {sender}: {message} ======================',
         )
@@ -59,23 +67,16 @@ class UserAgent(Agent):
     async def prompt_user(
         self,
         sender: str,
-        agent_id: str,
         user_prompt: UserPrompt,
     ) -> str:
         """Prompt the user for a response and block until the user selects one."""
         loop = asyncio.get_event_loop()
-        prompt_id = self._dashboard.push_prompt(sender, agent_id, user_prompt)
+        prompt_id = self._dashboard.push_prompt(sender, user_prompt)
         return await loop.run_in_executor(
             None,
             self._dashboard.wait_for_response,
             prompt_id,
         )
-
-    @action
-    async def shutdown_connected_agent(self, agent_id: str) -> None:
-        """Remote shutdown another agent"""
-        logger.debug(f'Attempting remote shut down of agent {agent_id}')
-        await self._agent_manager.get_handle(agent_id).shutdown()
 
     @action
     async def get_messages(self) -> dict[str, Any]:

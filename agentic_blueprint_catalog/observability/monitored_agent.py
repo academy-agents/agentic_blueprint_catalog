@@ -57,6 +57,7 @@ class MonitoredAgent(Agent):
         self._log_buf: _queue.SimpleQueue[tuple[str, str]] = (
             _queue.SimpleQueue()
         )
+        self._agent_uid_str = str(self.agent_id.uid)
         self._log_handler = _UserAgentLogHandler(self._log_buf)
         logging.getLogger().addHandler(self._log_handler)
         logging.getLogger().setLevel(logging.INFO)
@@ -99,16 +100,17 @@ class MonitoredAgent(Agent):
     async def _send_message(self, message: Message) -> None:
         """Send a message to the UserAgent."""
         print(f'Sending message to UserAgent {message}')
-        await self.user_agent.message(self.agent_name, message)
+        await self.user_agent.message(self._agent_uid_str, message)
 
     @action
     async def log(self, message: str, level: str = 'INFO') -> None:
         """Action to report a log message to the UserAgent."""
         print(f'Monitored Agent : message={message} level={level}')
+        print(f'Agent id : {self._agent_uid_str}')
         await self._send_message(
             Log(
+                agent_id=self._agent_uid_str,
                 agent_name=self.agent_name,
-                agent_id=self.agent_id,
                 message=message,
                 level=level,
             ),
@@ -125,9 +127,12 @@ class MonitoredAgent(Agent):
         Note: This call will block until the user has supplied a response.
         """
         return await self.user_agent.prompt_user(
-            self.agent_name,
-            str(self.agent_id.uid),
-            UserPrompt(prompt=prompt, responses=responses),
+            self._agent_uid_str,
+            UserPrompt(
+                agent_id=str(self.agent_id.uid),
+                prompt=prompt,
+                responses=responses,
+            ),
         )
 
     async def _report_stats(self, report_period_s: int = 30) -> None:
@@ -166,7 +171,7 @@ class MonitoredAgent(Agent):
 
         intro = Registration(
             agent_name=self.agent_name,
-            agent_id=str(self.agent_id.uid),
+            agent_id=self._agent_uid_str,
             fqdn=socket.getfqdn(),
             cpu=platform.processor(),
             gpu='?',
@@ -203,6 +208,7 @@ class MonitoredAgent(Agent):
             pass
 
         return Stats(
+            agent_id=self._agent_uid_str,
             cpu_percent=proc.cpu_percent(interval=0.1),
             memory_rss_mb=mem.rss / 1024**2,
             memory_vms_mb=mem.vms / 1024**2,
