@@ -20,8 +20,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import pickle
-
-# from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
 
 from academy.agent import action
@@ -31,9 +29,7 @@ from academy.handle import Handle
 from academy.logging import init_logging
 from academy.manager import Manager
 
-from agentic_blueprint_catalog.observability.monitored_agent import (
-    MonitoredAgent,
-)
+from agentic_blueprint_catalog.observability.monitored_agent import MonitoredAgent
 from agentic_blueprint_catalog.observability.user_agent import UserAgent
 
 
@@ -47,7 +43,7 @@ class Spinner(MonitoredAgent):
     @action
     async def run(self, iterations: int = 3) -> str:
         """Simulate work and emit log messages that are forwarded to UserAgent."""
-        logging.info('Starting run! 🚀🚀🚀')
+        logging.info('Starting run! \(^o^)/')
         for i in range(iterations):
             logging.info(
                 f'{self.agent_name} iteration %d/%d',
@@ -55,35 +51,32 @@ class Spinner(MonitoredAgent):
                 iterations,
             )
             await asyncio.sleep(10)
-        logging.warning('Finishing run! 🏁🏁🏁')
+        logging.warning('Finishing run! (✯◡✯)')
         return f'Finished {iterations} iterations'
 
     @action
     async def poke(self) -> int:
-        logging.warning('I just got Poked!')
+        """Mock action that emits a log."""
+        logging.warning('I just got Poked!  (⊙__⊙) ')
         return 4
 
     @action
     async def trigger_user_query(self) -> None:
-        logging.info('Triggering user query!')
+        """Trigger a user query."""
+        logging.info('Triggering user query! ¯\_(ツ)_/¯ ')
         response = await self.prompt_user_agent(
             'Should I continue?',
             responses=['Yes', 'No'],
         )
-        print(f'Got {response=} from user prompt')
-        logging.info('This is an info log')
-        logging.debug('This is a debug log')
-        logging.error('This is an error log')
-        logging.warning('This is an warning log')
         try:
-            5 / 0
+            _ = 5 / 0
         except ZeroDivisionError:
             logging.exception('Something went wrong!')
         logging.info(f'Got response: {response} from user query')
 
 
 class Sleeper(MonitoredAgent):
-    """An Agent that sleeps"""
+    """An Agent that sleeps."""
 
     def __init__(self, user_agent_handle: Handle[UserAgent]) -> None:
         super().__init__(user_agent_handle=user_agent_handle)
@@ -91,6 +84,7 @@ class Sleeper(MonitoredAgent):
 
     @loop
     async def cycle(self, shutdown: asyncio.Event) -> None:
+        """Log and sleep in loop."""
         counter = 0
         while not shutdown.is_set():
             await asyncio.sleep(30)
@@ -100,6 +94,7 @@ class Sleeper(MonitoredAgent):
 
 
 async def main(user_agent_id: str) -> None:
+    """Launch MonitoredAgents."""
     init_logging(logging.INFO)
 
     async with await Manager.from_exchange_factory(
@@ -128,6 +123,7 @@ async def main(user_agent_id: str) -> None:
 
         # 3. Trigger work on the worker — log messages are forwarded automatically.
         await spinner.run(iterations=5)
+        [handle.shutdown() for handle in handles]
         logging.info('All done!')
 
 
