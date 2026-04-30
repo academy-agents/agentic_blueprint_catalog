@@ -19,8 +19,11 @@ from academy.logging import init_logging
 from academy.manager import Manager
 
 
-def md_sim_tool(duration: int = 10):
+def md_sim_tool(duration: float = 10) -> str:
     """Simulate call to an Molecular Dynamics tool."""
+    import time
+
+    time.sleep(duration)
     return platform.uname().node
 
 
@@ -32,21 +35,22 @@ class Director(Agent):
         self.executor = ProcessPoolExecutor(max_workers=4)
 
     @action
-    async def md_sim(self, iterations: int = 4):
+    async def md_sim(self, duration: float = 2) -> None:
         """Run expensive MD sim task with Parsl."""
-        future = self.executor.submit(md_sim_tool)
-        return await asyncio.wrap_future(future)
+        future = self.executor.submit(md_sim_tool, duration=duration)
+        return await asyncio.wrap_future(future)  # type:ignore[arg-type]
 
     async def agent_on_shutdown(self) -> None:
         """Cleanup."""
         self.executor.shutdown()
 
 
-async def main():
+async def main() -> None:
     """Launch agents in a Process Pool."""
     init_logging(logging.INFO)
     exchange = HttpExchangeFactory(
-        url='https://exchange.academy-agents.org', auth_method='globus',
+        url='https://exchange.academy-agents.org',
+        auth_method='globus',
     )
     executor = ProcessPoolExecutor(max_workers=2)
 

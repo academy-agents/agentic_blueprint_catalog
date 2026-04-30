@@ -7,6 +7,7 @@ import logging
 import os
 import platform
 import queue as _queue
+import socket
 from typing import Any
 
 import academy.exception
@@ -32,6 +33,7 @@ class _UserAgentLogHandler(logging.Handler):
         self._buf = buf
 
     def emit(self, record: logging.LogRecord) -> None:
+        """Push log records in a queue for async processing."""
         # Skip academy and asyncio internals to prevent feedback loops.
         if record.name.startswith(('academy', 'asyncio')):
             return
@@ -54,9 +56,8 @@ class MonitoredAgent(Agent):
         self.user_agent = user_agent_handle
 
     async def agent_on_startup(self) -> None:
-        self._log_buf: _queue.SimpleQueue[tuple[str, str]] = (
-            _queue.SimpleQueue()
-        )
+        """Initiate log handlers for communication with UserAgent."""
+        self._log_buf: _queue.SimpleQueue[tuple[str, str]] = _queue.SimpleQueue()
         self._agent_uid_str = str(self.agent_id.uid)
         self._log_handler = _UserAgentLogHandler(self._log_buf)
         logging.getLogger().addHandler(self._log_handler)
@@ -167,8 +168,6 @@ class MonitoredAgent(Agent):
 
     async def agent_registration(self) -> None:
         """Send registration message with hardware info and geolocation."""
-        import socket
-
         intro = Registration(
             agent_name=self.agent_name,
             agent_id=self._agent_uid_str,

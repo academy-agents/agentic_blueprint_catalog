@@ -1,4 +1,7 @@
-"""Shared message types for the observability module."""
+"""Shared message types for the observability module.
+
+These messages will be sent from the MonitoredAgent to the UserAgent.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +12,8 @@ from typing import Any
 
 @dataclass
 class Registration:
+    """Agent info to be presented to the UserAgent on registration."""
+
     agent_id: str
     agent_name: str
     fqdn: str
@@ -22,6 +27,8 @@ class Registration:
 
 @dataclass
 class Log:
+    """Arbitrary log message."""
+
     agent_id: str
     agent_name: str
     message: str
@@ -30,6 +37,8 @@ class Log:
 
 @dataclass
 class Stats:
+    """Agent stats."""
+
     agent_id: str
     cpu_percent: float
     memory_rss_mb: float
@@ -39,6 +48,8 @@ class Stats:
 
 @dataclass
 class UserPrompt:
+    """Prompt and response choices to be presented to the user."""
+
     agent_id: str
     prompt: str
     responses: list[str]

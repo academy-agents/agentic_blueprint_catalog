@@ -22,11 +22,12 @@ from globus_compute_sdk import Executor
 from agentic_blueprint_catalog.agents.director import Director
 
 
-async def main():
+async def main() -> None:
     """Use GlobusCompute to two Director agents onto a batch job."""
     init_logging(logging.INFO)
     exchange = HttpExchangeFactory(
-        url='https://exchange.academy-agents.org', auth_method='globus',
+        url='https://exchange.academy-agents.org',
+        auth_method='globus',
     )
     executor = Executor(
         endpoint_id='9bfbd7a8-296e-4b57-8e7f-90e75ae581e7',
@@ -43,14 +44,16 @@ async def main():
 
         current_time = datetime.now()
         director1_handle: Handle = await manager.launch(
-            Director, args=(
-                os.path.abspath(f"{current_time.strftime('%H.%M.%S')}.00"),
+            Director,
+            args=(
+                os.path.abspath(f'{current_time.strftime("%H.%M.%S")}.00'),
                 os.path.abspath('/tmp/node_slice.00'),
             ),
         )
         director2_handle: Handle = await manager.launch(
-            Director, args=(
-                os.path.abspath(f"{current_time.strftime('%H.%M.%S')}.01"),
+            Director,
+            args=(
+                os.path.abspath(f'{current_time.strftime("%H.%M.%S")}.01'),
                 os.path.abspath('/tmp/node_slice.01'),
             ),
         )

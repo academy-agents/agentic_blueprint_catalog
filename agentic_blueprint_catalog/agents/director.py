@@ -1,4 +1,5 @@
 """Director agent that runs MD sim tools in parallel."""
+
 from __future__ import annotations
 
 import asyncio
@@ -16,9 +17,10 @@ from parsl.providers import LocalProvider
 
 
 @python_app
-def md_sim_tool(duration: int = 10):
+def md_sim_tool(duration: int = 10) -> str:
     """Simulate call to a Molecular Dynamics tool."""
     import platform  # noqa: PLC0415
+
     time.sleep(duration)
     return platform.uname().node
 
@@ -46,13 +48,13 @@ class Director(Agent):
                     # Launch 12 workers per node each binding to a GPU tile
                     max_workers_per_node=12,
                     available_accelerators=12,
-
                     # Use local provider since we are running parsl inside
                     # provisioned batch job
                     provider=LocalProvider(
                         # Use mpiexec to launch workers across multiple node
                         launcher=MpiExecLauncher(
-                            bind_cmd='--cpu-bind', overrides='--ppn 1',
+                            bind_cmd='--cpu-bind',
+                            overrides='--ppn 1',
                         ),
                         # Number of nodes per PBS job, setting to 2 in debug
                         nodes_per_block=num_nodes,
@@ -69,12 +71,12 @@ class Director(Agent):
         self.dfk = parsl.load(config)
 
     @action
-    async def md_sim(self):
+    async def md_sim(self) -> str:
         """md_sim is a blocking call executed by Parsl."""
         return await asyncio.wrap_future(md_sim_tool())
 
     @action
-    async def md_sim_batch(self, iterations: int = 4):
+    async def md_sim_batch(self, iterations: int = 4) -> str:
         """Execute a batch of MD calls in parallel with parsl."""
         futures = [md_sim_tool() for _ in range(iterations)]
         # Wrap futures with asyncio

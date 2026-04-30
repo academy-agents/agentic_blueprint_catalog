@@ -170,4 +170,3 @@ task1 = asyncio.create_task(director1.md_sim_batch())
 task2 = asyncio.create_task(director2.md_sim_batch())
 results = await asyncio.gather(task1, task2)
 ```
-

@@ -1,4 +1,4 @@
-"""Launch the User Agent in local threads and wait"""
+"""Launch the User Agent in local threads and wait."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from agentic_blueprint_catalog.observability.user_agent import UserAgent
 
 
 async def launch() -> None:
+    """Launch UserAgent in ThreadPoolExecutor and write handle info to file."""
     init_logging()
 
     async with await Manager.from_exchange_factory(

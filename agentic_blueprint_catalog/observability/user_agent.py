@@ -25,6 +25,7 @@ class UserAgent(Agent):
     """Receives messages from MonitoredAgents and serves a live web dashboard."""
 
     def __init__(self, host: str = '0.0.0.0', port: int = 8000) -> None:
+
         super().__init__()
         print(f'Starting user agent on Port: {port}')
         self._dashboard = Dashboard(host=host, port=port)
