@@ -43,7 +43,7 @@ class Spinner(MonitoredAgent):
     @action
     async def run(self, iterations: int = 3) -> str:
         """Simulate work and emit log messages that are forwarded to UserAgent."""
-        logging.info('Starting run! \(^o^)/')
+        logging.info('Starting run!')
         for i in range(iterations):
             logging.info(
                 f'{self.agent_name} iteration %d/%d',
@@ -51,19 +51,19 @@ class Spinner(MonitoredAgent):
                 iterations,
             )
             await asyncio.sleep(10)
-        logging.warning('Finishing run! (✯◡✯)')
+        logging.warning('Finishing run!')
         return f'Finished {iterations} iterations'
 
     @action
     async def poke(self) -> int:
         """Mock action that emits a log."""
-        logging.warning('I just got Poked!  (⊙__⊙) ')
+        logging.warning('I just got Poked!')
         return 4
 
     @action
     async def trigger_user_query(self) -> None:
         """Trigger a user query."""
-        logging.info('Triggering user query! ¯\_(ツ)_/¯ ')
+        logging.info('Triggering user query!')
         response = await self.prompt_user_agent(
             'Should I continue?',
             responses=['Yes', 'No'],
