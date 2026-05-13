@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import pickle
 from concurrent.futures import ThreadPoolExecutor
@@ -13,7 +14,7 @@ from academy.manager import Manager
 from agentic_blueprint_catalog.observability.user_agent import UserAgent
 
 
-async def launch() -> None:
+async def launch(port: int) -> None:
     """Launch UserAgent in ThreadPoolExecutor and write handle info to file."""
     init_logging()
 
@@ -21,7 +22,7 @@ async def launch() -> None:
         factory=HttpExchangeFactory(),
         executors=ThreadPoolExecutor(max_workers=4),
     ) as manager:
-        agent_hdl = await manager.launch(UserAgent)
+        agent_hdl = await manager.launch(UserAgent, kwargs={'port': port})
         print(f'User Agent Handle >>>> {agent_hdl.agent_id.uid!s}')
 
         with open('user_agent_handle.pkl', 'wb') as f:
@@ -30,4 +31,8 @@ async def launch() -> None:
 
 
 if __name__ == '__main__':
-    asyncio.run(launch())
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-p', '--port', default=8000, type=int, help='Port at which the flask service is listening')
+    parser.add_argument('-u', '--user_agent_id', help='User Agent will use this ID if specified')
+    args = parser.parse_args()
+    asyncio.run(launch(port=args.port))

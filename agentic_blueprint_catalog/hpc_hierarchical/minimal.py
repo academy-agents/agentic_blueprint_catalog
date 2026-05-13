@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import platform
+import time
 from concurrent.futures import ProcessPoolExecutor
 
 from academy.agent import action
@@ -21,8 +22,6 @@ from academy.manager import Manager
 
 def md_sim_tool(duration: float = 10) -> str:
     """Simulate call to an Molecular Dynamics tool."""
-    import time
-
     time.sleep(duration)
     return platform.uname().node
 

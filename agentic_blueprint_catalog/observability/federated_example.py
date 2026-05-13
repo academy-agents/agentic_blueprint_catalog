@@ -6,12 +6,15 @@ infrastructure is required to run this example.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import logging
 import pickle
+import uuid
 from concurrent.futures import ProcessPoolExecutor
 
 from academy.exchange.cloud import HttpExchangeFactory
+from academy.identifier import AgentId
 from academy.logging import init_logging
 from academy.manager import Manager
 from globus_compute_sdk import Executor as GlobusExecutor
@@ -20,24 +23,24 @@ from agentic_blueprint_catalog.observability.example import Sleeper
 from agentic_blueprint_catalog.observability.example import Spinner
 
 
-async def main() -> None:
+async def main(user_agent: str | None) -> None:
     """Launch MonitoredAgents across facilities with Globus Compute."""
     init_logging(logging.INFO)
 
     executors = {
         'nersc': GlobusExecutor(endpoint_id='07b73b75-d534-428f-acd8-003b01a166f5'),
-        # 'anvil': GlobusExecutor(endpoint_id='5aafb4c1-27b2-40d8-a038-a0277611868f',
+        #'anvil': GlobusExecutor(endpoint_id='5aafb4c1-27b2-40d8-a038-a0277611868f',
         #                        user_endpoint_config={'worker_init': 'source ~/setup_env.sh'}),
-        # 'frontera': GlobusExecutor(endpoint_id='933cff43-f895-4b92-a5c0-536a5162b8ec'),
-        'polaris': GlobusExecutor(
-            endpoint_id='9a947ba5-f537-4681-acf3-cc66485aadec',
-            user_endpoint_config={
-                'queue': 'debug',
-                'walltime': '00:10:00',
-                'config_key': 'source /home/yadunand/setup_academy.sh',
-                'account': 'ModCon',
-            },
-        ),
+        #'frontera': GlobusExecutor(endpoint_id='933cff43-f895-4b92-a5c0-536a5162b8ec'),
+        #'polaris': GlobusExecutor(
+        #    endpoint_id='9a947ba5-f537-4681-acf3-cc66485aadec',
+        #    user_endpoint_config={
+        #        'queue': 'debug',
+        #        'walltime': '00:10:00',
+        #        'config_key': 'source /home/yadunand/setup_academy.sh',
+        #        'account': 'ModCon',
+        #    },
+        # ),
         'local': ProcessPoolExecutor(max_workers=4),
     }
 
@@ -46,9 +49,15 @@ async def main() -> None:
         executors=executors,
     ) as manager:
         # 1. Get UserAgent handle saved to a local pickle file
-        with open('user_agent_handle.pkl', 'rb') as f:
-            user_agent_id = pickle.load(f)
+        if user_agent:
+            user_agent_id = AgentId(uid=uuid.UUID(user_agent), name='UserAgent')
             user_agent_handle = manager.get_handle(user_agent_id)
+            x = await user_agent_handle.ping()
+            print(x)
+        else:
+            with open('user_agent_handle.pkl', 'rb') as f:
+                user_agent_id = pickle.load(f)
+                user_agent_handle = manager.get_handle(user_agent_id)
 
         # 2. Launch a few agents, and pass them the user_agent_handle
         handles = []
@@ -80,4 +89,8 @@ async def main() -> None:
 
 
 if __name__ == '__main__':
-    raise SystemExit(asyncio.run(main()))
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-u', '--user_agent', default=None, help='UserAgent ID')
+    args = parser.parse_args()
+
+    raise SystemExit(asyncio.run(main(user_agent=args.user_agent)))

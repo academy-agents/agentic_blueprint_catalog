@@ -38,11 +38,12 @@ class ToolEnabledFakeChatModel(GenericFakeChatModel):
         tools: Sequence[dict[str, Any] | type | Callable[..., Any] | BaseTool],
         **kwargs: Any,
     ) -> Any:
+        """Return self; tools are ignored by this fake model."""
         return self
 
 
 def get_llm() -> BaseChatModel:
-    """Load a chat model based on OpenAI API configs, failing that load a fake model"""
+    """Load a chat model based on OpenAI API configs, failing that load a fake model."""
     if os.environ.get('OPENAI_API_BASE_URL'):
         model = os.environ['OPENAI_API_MODEL']
         api_key = os.environ['OPENAI_API_KEY']

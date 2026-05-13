@@ -1,4 +1,4 @@
-"""Federated Agents example
+"""Federated Agents example.
 
 This example demonstrates how to deploy an agent to a remote system using Globus Compute.
 In this model, the Orchestrator and Simulator(s) are all launched onto an HPC system's
@@ -44,6 +44,8 @@ logger = logging.getLogger(__name__)
 
 
 class Orchestrator(Agent):
+    """Orchestrator agent that averages results from multiple PiCalculator simulators."""
+
     def __init__(
         self,
         simulators: list[Handle[PiCalculator]],
@@ -60,22 +62,6 @@ class Orchestrator(Agent):
             estimates.append(estimate)
 
         return sum(estimates) / len(estimates)
-
-
-'''
-class Simulator(Agent):
-    @action
-    async def simulate_pi(self, rounds: int = 100) -> float:
-        """Simulate pi using monte carlo simulation"""
-        inside_circle = 0
-        for _ in range(rounds):
-            x = random.uniform(-1, 1)
-            y = random.uniform(-1, 1)
-            if x * x + y * y <= 1:
-                inside_circle += 1
-
-        return 4 * (inside_circle / rounds)
-'''
 
 
 async def main() -> None:
