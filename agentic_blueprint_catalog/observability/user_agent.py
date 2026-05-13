@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 class UserAgent(Agent):
     """Receives messages from MonitoredAgents and serves a live web dashboard."""
 
-    def __init__(self, host: str = '0.0.0.0', port: int = 8000) -> None:
+    def __init__(self, host: str = '0.0.0.0', port: int = 8000, base_url: str = '') -> None:
 
         super().__init__()
         print(f'Starting user agent on Port: {port}')
-        self._dashboard = Dashboard(host=host, port=port)
+        self._dashboard = Dashboard(host=host, port=port, base_url=base_url)
 
     async def agent_on_startup(self) -> None:
         """Start the Flask dashboard on startup."""

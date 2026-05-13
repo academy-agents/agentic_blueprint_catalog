@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os as _os
@@ -23,6 +24,8 @@ from agentic_blueprint_catalog.observability.message import UserPrompt
 _ASSETS_DIR = _os.path.join(_os.path.dirname(__file__), 'assets')
 
 logger = logging.getLogger(__name__)
+
+_LOG_BUFFER_SIZE = 2000
 
 # ---------------------------------------------------------------------------
 # HTML / CSS / JS  (served as a single self-contained page)
@@ -111,7 +114,8 @@ _HTML = r"""<!DOCTYPE html>
     [data-theme="light"] .sh-line  { background:linear-gradient(to right,var(--border),transparent); }
     [data-theme="light"] .tab-btn  { border-color:rgba(0,80,200,.22); color:var(--dim); }
     [data-theme="light"] .tab-btn:hover  { border-color:var(--cyan); color:var(--cyan); background:rgba(0,80,200,.05); }
-    [data-theme="light"] .tab-btn.active { border-color:var(--cyan); color:var(--cyan); background:rgba(0,80,200,.1); box-shadow:0 0 16px rgba(0,80,200,.12),inset 0 0 16px rgba(0,80,200,.04); }
+    [data-theme="light"] .tab-btn.active { border-color:var(--cyan); color:var(--cyan); background:rgba(0,80,200,.1);
+      box-shadow:0 0 16px rgba(0,80,200,.12),inset 0 0 16px rgba(0,80,200,.04); }
     [data-theme="light"] .hud { color:var(--dim); }
     [data-theme="light"] .hud-val { color:var(--cyan); }
     [data-theme="light"] .btn  { border-color:rgba(0,80,200,.28); color:var(--dim); }
@@ -120,7 +124,8 @@ _HTML = r"""<!DOCTYPE html>
     [data-theme="light"] .log-info { color:var(--dim); }
     [data-theme="light"] .empty-agents { color:rgba(0,80,200,.22); }
     [data-theme="light"] #modal-wrap { background:rgba(190,215,240,.78); }
-    [data-theme="light"] .modal { background:rgba(242,248,255,.98); border-color:var(--cyan); box-shadow:0 0 0 1px rgba(0,80,200,.1),0 0 45px rgba(0,80,200,.14),0 0 90px rgba(0,64,200,.08); }
+    [data-theme="light"] .modal { background:rgba(242,248,255,.98); border-color:var(--cyan);
+      box-shadow:0 0 0 1px rgba(0,80,200,.1),0 0 45px rgba(0,80,200,.14),0 0 90px rgba(0,64,200,.08); }
     [data-theme="light"] .modal::before { border-color:var(--cyan); }
     [data-theme="light"] .modal::after  { border-color:var(--cyan); }
     [data-theme="light"] .modal-from { color:var(--dim); }
@@ -607,7 +612,7 @@ let currentPromptId = null;
 const t0 = Date.now();
 
 // ── SSE ──────────────────────────────────────────────────────────────────
-const es = new EventSource('/events');
+const es = new EventSource('__BASE_URL__/events');
 
 es.addEventListener('init', e => {
   const s = JSON.parse(e.data);
@@ -807,7 +812,7 @@ function showNextPrompt() {
 
 function selectResponse(response) {
   if (!currentPromptId) return;
-  fetch('/respond/' + encodeURIComponent(currentPromptId), {
+  fetch('__BASE_URL__/respond/' + encodeURIComponent(currentPromptId), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ response }),
@@ -818,14 +823,14 @@ function selectResponse(response) {
 
 function dismissPrompt() {
   if (!currentPromptId) return;
-  fetch('/dismiss/' + encodeURIComponent(currentPromptId), { method: 'POST' });
+  fetch('__BASE_URL__/dismiss/' + encodeURIComponent(currentPromptId), { method: 'POST' });
   pendingPrompts = pendingPrompts.filter(p => p.id !== currentPromptId);
   showNextPrompt();
 }
 
 // ── Shutdown agent ────────────────────────────────────────────────────────
 function shutdownAgent(name) {
-  fetch('/shutdown/' + encodeURIComponent(name), { method: 'POST' });
+  fetch('__BASE_URL__/shutdown/' + encodeURIComponent(name), { method: 'POST' });
   const safeId = 'card-' + name.replace(/[^a-zA-Z0-9_-]/g, '_');
   const card = document.getElementById(safeId);
   if (card) { card.style.opacity = '0.4'; card.style.pointerEvents = 'none'; }
@@ -1080,9 +1085,10 @@ switchTab = function (btn) {
 class Dashboard:
     """Thread-safe state store that drives the Flask SSE dashboard."""
 
-    def __init__(self, host: str = '0.0.0.0', port: int = 8000) -> None:
+    def __init__(self, host: str = '0.0.0.0', port: int = 8000, base_url: str = '') -> None:
         self.host = host
         self.port = port
+        self.base_url = base_url
         self._agents: dict[str, dict[str, Any]] = {}
         self._logs: list[dict[str, Any]] = []
         self._prompts: list[dict[str, Any]] = []
@@ -1091,14 +1097,13 @@ class Dashboard:
         self._shutdown_callback: Any = None
         self._prompt_events: dict[str, threading.Event] = {}
         self._prompt_results: dict[str, str] = {}
+        self._html = _HTML.replace('__BASE_URL__', self.base_url)
         self._app = self._build_app()
 
     # ── public API ────────────────────────────────────────────────────────
 
     def start(self) -> None:
         """Start Flask in a background daemon thread."""
-        import logging
-
         log = logging.getLogger('werkzeug')
         log.setLevel(logging.ERROR)
         t = threading.Thread(
@@ -1109,6 +1114,7 @@ class Dashboard:
         t.start()
 
     def agent_heartbeat(self, sender: str) -> None:
+        """Send agent heartbeat."""
         with self._lock:
             if sender not in self._agents:
                 self._agents[sender] = {'last_seen': time.time()}
@@ -1116,6 +1122,7 @@ class Dashboard:
 
     def _find_facility_logo(self, org: str, fqdn: str) -> str | None:
         """Return /assets/<filename> if any logo file keyword matches org.
+
         We ignore fqdn for now.
         """
         if not _os.path.isdir(_ASSETS_DIR):
@@ -1127,6 +1134,7 @@ class Dashboard:
         return '/assets/logo-Academy-2025-200x200-dark-bg.png'
 
     def register_agent(self, sender: str, reg: Registration) -> None:
+        """Register agent."""
         raw = dict(reg.geolocation)  # copy so we can mutate
         # ipinfo.io returns location as "lat,lon" in a single 'loc' field.
         # Normalise to separate float keys so the JS can use d.geo.lat directly.
@@ -1162,6 +1170,7 @@ class Dashboard:
         self._broadcast('registration', data)
 
     def push_log(self, sender: str, msg: Log) -> None:
+        """Append a log entry from an agent and broadcast it to subscribers."""
         logger.warning(f'Pushing log {msg.agent_name=}  {msg.agent_id=}')
         entry: dict[str, Any] = {
             'ts': time.strftime('%H:%M:%S'),
@@ -1172,11 +1181,12 @@ class Dashboard:
         }
         with self._lock:
             self._logs.append(entry)
-            if len(self._logs) > 2000:
-                self._logs = self._logs[-2000:]
+            if len(self._logs) > _LOG_BUFFER_SIZE:
+                self._logs = self._logs[-_LOG_BUFFER_SIZE:]
         self._broadcast('log', entry)
 
     def push_stats(self, sender: str, stats: Stats) -> None:
+        """Update an agent's resource stats and broadcast to subscribers."""
         data: dict[str, Any] = {
             'agent': sender,
             'cpu_percent': stats.cpu_percent,
@@ -1194,6 +1204,7 @@ class Dashboard:
         sender: str,
         prompt: UserPrompt,
     ) -> str:
+        """Broadcast a user-prompt request and return its ID for polling."""
         agent_name = self._agents[sender]['agent_name']
         entry: dict[str, Any] = {
             'id': f'{time.time():.6f}',
@@ -1210,6 +1221,7 @@ class Dashboard:
         return entry['id']
 
     def submit_response(self, prompt_id: str, response: str) -> None:
+        """Record a response to a pending prompt and unblock any waiter."""
         with self._lock:
             self._prompts = [p for p in self._prompts if p['id'] != prompt_id]
             self._prompt_results[prompt_id] = response
@@ -1218,6 +1230,7 @@ class Dashboard:
             event.set()
 
     def wait_for_response(self, prompt_id: str) -> str:
+        """Block until a response is submitted for the given prompt ID."""
         with self._lock:
             event = self._prompt_events.get(prompt_id)
         if event is not None:
@@ -1227,6 +1240,7 @@ class Dashboard:
             return self._prompt_results.pop(prompt_id, '')
 
     def dismiss_prompt(self, prompt_id: str) -> None:
+        """Dismiss a pending prompt without a response."""
         self.submit_response(prompt_id, '')
 
     def set_shutdown_callback(self, callback: Any) -> None:
@@ -1243,10 +1257,8 @@ class Dashboard:
 
     def _unsubscribe(self, q: queue.Queue[str]) -> None:
         with self._lock:
-            try:
+            with contextlib.suppress(ValueError):
                 self._subscribers.remove(q)
-            except ValueError:
-                pass
 
     def _broadcast(self, event: str, data: Any) -> None:
         msg = f'event: {event}\ndata: {json.dumps(data)}\n\n'
@@ -1270,30 +1282,30 @@ class Dashboard:
 
     # ── Flask app ─────────────────────────────────────────────────────────
 
+    def _event_stream(self, q: queue.Queue[str]) -> Any:
+        """Yield SSE messages from the queue, sending heartbeats when idle."""
+        try:
+            yield f'event: init\ndata: {json.dumps(self._snapshot())}\n\n'
+            while True:
+                try:
+                    yield q.get(timeout=25)
+                except queue.Empty:
+                    yield ': heartbeat\n\n'
+        finally:
+            self._unsubscribe(q)
+
     def _build_app(self) -> Flask:
         app = Flask(__name__)
 
         @app.route('/')
         def index() -> Response:
-            return Response(_HTML, mimetype='text/html')
+            return Response(self._html, mimetype='text/html')
 
         @app.route('/events')
         def events() -> Response:
             q = self._subscribe()
-
-            def stream() -> Any:
-                try:
-                    yield f'event: init\ndata: {json.dumps(self._snapshot())}\n\n'
-                    while True:
-                        try:
-                            yield q.get(timeout=25)
-                        except queue.Empty:
-                            yield ': heartbeat\n\n'
-                finally:
-                    self._unsubscribe(q)
-
             return Response(
-                stream(),
+                self._event_stream(q),
                 mimetype='text/event-stream',
                 headers={
                     'Cache-Control': 'no-cache',
