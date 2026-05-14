@@ -35,7 +35,7 @@ class UserAgent(Agent):
     async def agent_on_startup(self) -> None:
         """Start the Flask dashboard on startup."""
         loop = asyncio.get_event_loop()
-        formatted_base_url = self.base_url.format(agent_id=self.agent_id, port=self.port)
+        formatted_base_url = self.base_url.format(agent_id=self.agent_id.uid, port=self.port)
         self._dashboard = Dashboard(host=self.host, port=self.port, base_url=formatted_base_url)
 
         def _shutdown_callback(agent_id: str) -> None:
