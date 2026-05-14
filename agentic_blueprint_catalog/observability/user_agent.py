@@ -28,7 +28,8 @@ class UserAgent(Agent):
 
         super().__init__()
         print(f'Starting user agent on Port: {port}')
-        self._dashboard = Dashboard(host=host, port=port, base_url=base_url)
+        formatted_base_url = base_url.format(agent_id=self.agent_id, port=port)
+        self._dashboard = Dashboard(host=host, port=port, base_url=formatted_base_url)
 
     async def agent_on_startup(self) -> None:
         """Start the Flask dashboard on startup."""
